@@ -88,6 +88,10 @@ button, select, input {
   height: 100vh;
 }
 
+.mobile-toolbar {
+  display: none;
+}
+
 .calendar-panel {
   width: 320px;
   flex-shrink: 0;
@@ -136,6 +140,25 @@ button, select, input {
 
 .spacer {
   flex: 1;
+}
+
+.template-toggle-btn {
+  width: 100%;
+  background: #2d2d2d;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.template-toggle-btn:hover {
+  background: #37373d;
+}
+.template-toggle-btn.active {
+  background: #007acc;
+  color: #ffffff;
+  border-color: #007acc;
 }
 
 .calendar-grid {
@@ -280,4 +303,49 @@ button, select, input {
 }
 .ql-editor.ql-blank::before {
   color: #6a6a6a;
+}
+
+/* --- Mobile: one panel at a time instead of squeezing both side by side --- */
+
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+    height: 100vh;
+  }
+
+  .mobile-toolbar {
+    display: flex;
+    flex-shrink: 0;
+    background: #252526;
+    border-bottom: 1px solid #3c3c3c;
+  }
+
+  .mobile-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #a0a0a0;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .mobile-tab.active {
+    color: #ffffff;
+    border-bottom-color: #007acc;
+  }
+
+  .calendar-panel,
+  .editor-panel {
+    width: 100%;
+    border-right: none;
+  }
+
+  .app.view-calendar .editor-panel {
+    display: none;
+  }
+  .app.view-editor .calendar-panel {
+    display: none;
+  }
 }

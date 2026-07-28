@@ -26,6 +26,20 @@
   const yearSelect = document.getElementById("year-select");
   const templateBtn = document.getElementById("template-btn");
   const importTemplateBtn = document.getElementById("import-template-btn");
+  const appRoot = document.getElementById("app-root");
+  const mobileTabCalendar = document.getElementById("mobile-tab-calendar");
+  const mobileTabEditor = document.getElementById("mobile-tab-editor");
+
+  // Only matters below the CSS breakpoint (see style.css) - on desktop both
+  // panels are always visible regardless of this class.
+  function showMobileView(view) {
+    appRoot.classList.toggle("view-calendar", view === "calendar");
+    appRoot.classList.toggle("view-editor", view === "editor");
+    mobileTabCalendar.classList.toggle("active", view === "calendar");
+    mobileTabEditor.classList.toggle("active", view === "editor");
+  }
+  mobileTabCalendar.addEventListener("click", () => showMobileView("calendar"));
+  mobileTabEditor.addEventListener("click", () => showMobileView("editor"));
 
   MONTHS.forEach((name, i) => {
     const opt = document.createElement("option");
@@ -158,6 +172,7 @@
     dateLabel.textContent = formatDateLabel(dateStr);
     await loadCurrent();
     renderCalendar();
+    showMobileView("editor");
   }
 
   async function toggleTemplate() {
@@ -168,6 +183,7 @@
     dateLabel.textContent = viewingTemplate ? "Template" : formatDateLabel(selectedDate);
     await loadCurrent();
     renderCalendar();
+    showMobileView("editor");
   }
 
   async function loadCurrent() {
