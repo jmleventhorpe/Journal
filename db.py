@@ -20,6 +20,8 @@ from crypto import (
     decrypt_bytes,
 )
 
+TEMPLATE_KEY = "__template__"  # sentinel "date" in entries, never a real calendar day
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
@@ -73,7 +75,7 @@ def unlock(conn: sqlite3.Connection, password: str):
 
 
 def list_entry_dates(conn: sqlite3.Connection) -> set:
-    rows = conn.execute("SELECT date FROM entries").fetchall()
+    rows = conn.execute("SELECT date FROM entries WHERE date != ?", (TEMPLATE_KEY,)).fetchall()
     return {r[0] for r in rows}
 
 
@@ -124,3 +126,15 @@ def delete_entry(conn: sqlite3.Connection, date: str):
     conn.execute("DELETE FROM images WHERE entry_date = ?", (date,))
     conn.execute("DELETE FROM entries WHERE date = ?", (date,))
     conn.commit()
+
+
+def get_template(conn: sqlite3.Connection, key: bytes):
+    """Returns (html_text, {image_id: raw_bytes}) or (None, {}) if no template is saved."""
+    return get_entry(conn, key, TEMPLATE_KEY)
+
+
+def save_template(conn: sqlite3.Connection, key: bytes, html_text: str, images: dict):
+    if html_text.strip() or images:
+        save_entry(conn, key, TEMPLATE_KEY, html_text, images)
+    else:
+        delete_entry(conn, TEMPLATE_KEY)
