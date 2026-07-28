@@ -297,7 +297,13 @@
     const path = viewingTemplate ? "/template" : `/entries/${selectedDate}`;
     const res = await api(path);
     const data = await res.json();
-    quill.root.innerHTML = toDisplayHtml(data.html);
+    // Not quill.root.innerHTML = ... - that bypasses Quill's own Delta
+    // model, leaving it out of sync with the DOM. Quill's internal
+    // MutationObserver then "reconciles" the external change, which is
+    // what was intermittently inserting extra empty paragraphs. This
+    // (single-string-argument) form of dangerouslyPasteHTML replaces the
+    // whole document through Quill's normal setContents path instead.
+    quill.clipboard.dangerouslyPasteHTML(toDisplayHtml(data.html), "silent");
     loading = false;
   }
 
