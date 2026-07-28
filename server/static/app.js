@@ -19,6 +19,112 @@
     },
   });
 
+  // --- Image sizing: newly inserted images are scaled to a sensible
+  // default automatically, and a toolbar dropdown (next to Insert Image)
+  // rescales every image already in the entry. Mirrors the desktop app's
+  // Small/Standard/Large presets and area-based scaling (see editor.py's
+  // _scaled_size_for_area) so a tall photo and a wide screenshot picked at
+  // the same preset end up with a similar visual footprint.
+  //
+  // Sized via the plain width/height HTML *attributes*, not CSS - that's
+  // what the desktop app's QTextImageFormat produces, and Qt's HTML
+  // renderer reliably reads that form but isn't guaranteed to honor
+  // arbitrary inline CSS. Using the same mechanism keeps images resized by
+  // either client fully interoperable with the other.
+  const STANDARD_IMAGE_AREA = 400 * 400;
+  const IMAGE_RESIZE_PRESETS = [
+    ["Small", STANDARD_IMAGE_AREA / 4],
+    ["Standard", STANDARD_IMAGE_AREA],
+    ["Large", Math.round(STANDARD_IMAGE_AREA * 2.25)],
+  ];
+
+  function scaledSizeForArea(naturalW, naturalH, targetArea) {
+    const naturalArea = naturalW * naturalH;
+    if (!naturalArea) return { width: naturalW, height: naturalH };
+    const scale = Math.sqrt(targetArea / naturalArea);
+    return {
+      width: Math.max(1, Math.round(naturalW * scale)),
+      height: Math.max(1, Math.round(naturalH * scale)),
+    };
+  }
+
+  quill.getModule("toolbar").addHandler("image", () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/*";
+    input.addEventListener("change", () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const probe = new Image();
+        probe.onload = () => {
+          const { width, height } = scaledSizeForArea(probe.naturalWidth, probe.naturalHeight, STANDARD_IMAGE_AREA);
+          const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+          quill.insertEmbed(range.index, "image", dataUrl, "user");
+          quill.setSelection(range.index + 1, 0, "silent");
+          const [leaf] = quill.getLeaf(range.index);
+          if (leaf && leaf.domNode && leaf.domNode.tagName === "IMG") {
+            leaf.domNode.setAttribute("width", width);
+            leaf.domNode.setAttribute("height", height);
+          }
+        };
+        probe.src = dataUrl;
+      };
+      reader.readAsDataURL(file);
+    });
+    input.click();
+  });
+
+  function resizeAllImages(targetArea) {
+    const imgs = quill.root.querySelectorAll("img");
+    if (!imgs.length) {
+      setStatus("No images in this entry.", 2000);
+      return;
+    }
+    imgs.forEach((imgEl) => {
+      const nw = imgEl.naturalWidth;
+      const nh = imgEl.naturalHeight;
+      if (!nw || !nh) return;
+      const { width, height } = scaledSizeForArea(nw, nh, targetArea);
+      imgEl.setAttribute("width", width);
+      imgEl.setAttribute("height", height);
+    });
+    // Direct DOM mutation, not a Quill API call, so it doesn't fire
+    // Quill's text-change event - schedule the save ourselves.
+    if (!loading) {
+      if (autosaveTimer) clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(() => {
+        autosaveTimer = null;
+        saveCurrent();
+      }, AUTOSAVE_DELAY_MS);
+    }
+  }
+
+  const resizeImagesSelect = document.createElement("select");
+  resizeImagesSelect.className = "resize-images-select";
+  resizeImagesSelect.title = "Resize all images in this entry";
+  const resizePlaceholder = document.createElement("option");
+  resizePlaceholder.textContent = "Resize Images";
+  resizePlaceholder.disabled = true;
+  resizePlaceholder.selected = true;
+  resizePlaceholder.hidden = true;
+  resizeImagesSelect.appendChild(resizePlaceholder);
+  IMAGE_RESIZE_PRESETS.forEach(([label, area]) => {
+    const opt = document.createElement("option");
+    opt.value = area;
+    opt.textContent = label;
+    resizeImagesSelect.appendChild(opt);
+  });
+  resizeImagesSelect.addEventListener("change", () => {
+    resizeAllImages(Number(resizeImagesSelect.value));
+    resizeImagesSelect.selectedIndex = 0;
+  });
+  quill.getModule("toolbar").container
+    .querySelector("button.ql-image")
+    .insertAdjacentElement("afterend", resizeImagesSelect);
+
   const dateLabel = document.getElementById("date-label");
   const statusEl = document.getElementById("status");
   const calendarGrid = document.getElementById("calendar-grid");

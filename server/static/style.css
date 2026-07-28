@@ -293,6 +293,30 @@ button, select, input {
   background: #252526;
   border: 1px solid #3c3c3c !important;
 }
+
+.resize-images-select {
+  background: #2d2d2d;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 3px 4px;
+  font-size: 13px;
+  margin-left: 6px;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+/* Quill's own default label for "no heading" is "Normal" - same word the
+   font-size dropdown right next to it uses for "default size", which reads
+   as a confusing duplicate. "Paragraph" is the more standard term editors
+   use for this. Excluding data-value 1/2/3 explicitly (rather than relying
+   on Quill's exact attribute pattern for the "unset" case, which varies by
+   version) means this can only ever affect the "no heading" option, never
+   clobber the Heading 1/2/3 labels, regardless of that pattern.  */
+.ql-snow .ql-picker.ql-header .ql-picker-label:not([data-value="1"]):not([data-value="2"]):not([data-value="3"])::before,
+.ql-snow .ql-picker.ql-header .ql-picker-item:not([data-value="1"]):not([data-value="2"]):not([data-value="3"])::before {
+  content: "Paragraph" !important;
+}
 .ql-container.ql-snow {
   border: none;
   font-size: 14px;
