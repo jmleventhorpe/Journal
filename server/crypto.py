@@ -1,5 +1,5 @@
 """
-Encryption for SimpleJournal.
+Encryption for Journal.
 
 Uses scrypt to derive a key from the user's password, and Fernet
 (AES-128-CBC + HMAC-SHA256, from the `cryptography` library) to

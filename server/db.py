@@ -1,5 +1,7 @@
 """
-SQLite storage for SimpleJournal.
+SQLite storage for Journal, owned exclusively by the Flask server (app.py).
+Nothing else touches journal.db directly - the desktop app talks to this
+over HTTP via the client db.py at the repo root.
 
 One row per day in `entries` (encrypted rich-text HTML as a blob).
 Images embedded in an entry are extracted and stored encrypted in
@@ -42,7 +44,12 @@ CREATE TABLE IF NOT EXISTS images (
 
 
 def connect(path: str) -> sqlite3.Connection:
-    conn = sqlite3.connect(path)
+    # check_same_thread=False: the Flask server handles requests on
+    # different threads (gunicorn --threads, or the dev server), unlike
+    # the desktop app this function originally served. Safe here because
+    # every caller of this connection serializes access with a lock
+    # (see _conn_lock in app.py) - sqlite3 itself just can't know that.
+    conn = sqlite3.connect(path, check_same_thread=False)
     conn.executescript(SCHEMA)
     conn.commit()
     return conn
@@ -126,6 +133,16 @@ def delete_entry(conn: sqlite3.Connection, date: str):
     conn.execute("DELETE FROM images WHERE entry_date = ?", (date,))
     conn.execute("DELETE FROM entries WHERE date = ?", (date,))
     conn.commit()
+
+
+def get_image(conn: sqlite3.Connection, key: bytes, image_id: str):
+    """Fetches a single image by id, independent of which entry it belongs
+    to (id is globally unique). Used to serve <img src="id"> requests from
+    the web client. Returns raw bytes, or None if no such image exists."""
+    row = conn.execute("SELECT data FROM images WHERE id = ?", (image_id,)).fetchone()
+    if row is None:
+        return None
+    return decrypt_bytes(key, bytes(row[0]))
 
 
 def get_template(conn: sqlite3.Connection, key: bytes):

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Journal</title>
+  <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="login-body">
+  <form id="auth-form" class="login-card" autocomplete="off">
+    <h1>Journal</h1>
+    {% if initialized %}
+      <p class="hint">Enter your journal password:</p>
+      <input type="password" id="password" placeholder="Password" autofocus>
+    {% else %}
+      <p class="hint">This password encrypts your journal.<br>There is no recovery - if you lose it, your entries cannot be read again.</p>
+      <input type="password" id="password" placeholder="Password" autofocus>
+      <input type="password" id="password2" placeholder="Confirm password">
+    {% endif %}
+    <p id="error" class="error"></p>
+    <button type="submit">{{ "Unlock" if initialized else "Create Journal" }}</button>
+  </form>
+
+  <script>
+    const INITIALIZED = {{ "true" if initialized else "false" }};
+    const form = document.getElementById("auth-form");
+    const errorEl = document.getElementById("error");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorEl.textContent = "";
+      const password = document.getElementById("password").value;
+
+      if (!INITIALIZED) {
+        const confirm = document.getElementById("password2").value;
+        if (password.length < 4) {
+          errorEl.textContent = "Password must be at least 4 characters.";
+          return;
+        }
+        if (password !== confirm) {
+          errorEl.textContent = "Passwords don't match.";
+          return;
+        }
+      }
+
+      const endpoint = INITIALIZED ? "/login" : "/api/setup";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        window.location.href = "/";
+      } else {
+        errorEl.textContent = data.error || "Something went wrong.";
+      }
+    });
+  </script>
+</body>
+</html>

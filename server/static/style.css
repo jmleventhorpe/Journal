@@ -1,0 +1,283 @@
+/* Same palette as the desktop app's VS Code Dark+ inspired theme. */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #1e1e1e;
+  color: #cccccc;
+  font-family: Verdana, "DejaVu Sans", "Liberation Sans", sans-serif;
+  font-size: 14px;
+}
+
+button, select, input {
+  font-family: inherit;
+}
+
+/* --- Login page --- */
+
+.login-body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-card {
+  background: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 32px;
+  width: 340px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-card h1 {
+  margin: 0 0 4px 0;
+  font-size: 20px;
+  color: #ffffff;
+}
+
+.login-card .hint {
+  margin: 0 0 8px 0;
+  color: #a0a0a0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.login-card input {
+  background: #3c3c3c;
+  color: #cccccc;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+.login-card input:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.login-card button {
+  background: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-card button:hover {
+  background: #1177bb;
+}
+
+.error {
+  color: #f48771;
+  min-height: 1em;
+  margin: 0;
+  font-size: 13px;
+}
+
+/* --- Main app --- */
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+.calendar-panel {
+  width: 320px;
+  flex-shrink: 0;
+  background: #252526;
+  border-right: 1px solid #3c3c3c;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  gap: 8px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #2d2d2d;
+  border: 1px solid #3c3c3c;
+  border-radius: 8px;
+  padding: 6px;
+}
+
+.nav-btn {
+  background: transparent;
+  color: #cccccc;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.nav-btn:hover {
+  background: #37373d;
+}
+.nav-btn.active {
+  background: #007acc;
+  color: #ffffff;
+}
+
+.calendar-nav select {
+  background: transparent;
+  color: #cccccc;
+  border: none;
+  font-weight: 600;
+  padding: 4px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.calendar-grid .weekday {
+  text-align: center;
+  font-size: 11px;
+  color: #8a8a8a;
+  padding: 4px 0;
+}
+.calendar-grid .weekday.weekend {
+  color: #999999;
+}
+
+.calendar-grid .day {
+  position: relative;
+  text-align: center;
+  padding: 8px 0;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #cccccc;
+}
+.calendar-grid .day:hover {
+  background: #2a2d2e;
+}
+.calendar-grid .day.other-month {
+  color: #656565;
+}
+.calendar-grid .day.weekend {
+  color: #999999;
+}
+.calendar-grid .day.selected {
+  background: #094771;
+  color: #ffffff;
+}
+.calendar-grid .day .dot {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #89d185;
+}
+
+.logout-btn {
+  margin-top: auto;
+  background: transparent;
+  color: #a0a0a0;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  padding: 6px;
+  cursor: pointer;
+}
+.logout-btn:hover {
+  background: #2a2d2e;
+}
+
+.editor-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.date-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.date-row h1 {
+  flex: 1;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+}
+
+.accent-btn {
+  background: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.accent-btn:hover {
+  background: #1177bb;
+}
+
+#editor {
+  flex: 1;
+  overflow-y: auto;
+  border: none;
+}
+
+.status-bar {
+  padding: 4px 16px;
+  border-top: 1px solid #3c3c3c;
+  background: #252526;
+  color: #a0a0a0;
+  font-size: 12px;
+  min-height: 1.4em;
+}
+
+/* --- Quill overrides to match the dark theme --- */
+
+.ql-toolbar.ql-snow {
+  background: #2d2d2d;
+  border: none;
+  border-bottom: 1px solid #3c3c3c;
+}
+.ql-toolbar.ql-snow .ql-stroke {
+  stroke: #cccccc;
+}
+.ql-toolbar.ql-snow .ql-fill {
+  fill: #cccccc;
+}
+.ql-toolbar.ql-snow .ql-picker {
+  color: #cccccc;
+}
+.ql-snow .ql-picker-options {
+  background: #252526;
+  border: 1px solid #3c3c3c !important;
+}
+.ql-container.ql-snow {
+  border: none;
+  font-size: 14px;
+}
+.ql-editor {
+  color: #d4d4d4;
+  padding: 16px;
+}
+.ql-editor.ql-blank::before {
+  color: #6a6a6a;
+}

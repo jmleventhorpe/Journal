@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Journal</title>
+  <link rel="icon" href="{{ url_for('static', filename='icon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css">
+</head>
+<body>
+  <div class="app">
+    <div class="calendar-panel">
+      <div class="calendar-nav">
+        <button id="prev-month" class="nav-btn" title="Previous month">◀</button>
+        <select id="month-select"></select>
+        <select id="year-select"></select>
+        <span class="spacer"></span>
+        <button id="next-month" class="nav-btn" title="Next month">▶</button>
+        <button id="template-btn" class="nav-btn" title="Edit the reusable template">Template</button>
+      </div>
+      <div id="calendar-grid" class="calendar-grid"></div>
+      <button id="logout-btn" class="logout-btn">Log out</button>
+    </div>
+
+    <div class="editor-panel">
+      <div class="date-row">
+        <h1 id="date-label"></h1>
+        <button id="import-template-btn" class="accent-btn">Import Template</button>
+      </div>
+      <div id="editor"></div>
+      <div id="status" class="status-bar"></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

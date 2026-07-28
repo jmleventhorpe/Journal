@@ -9,7 +9,7 @@ class SetPasswordDialog(QDialog):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Create your journal password")
-        self.setMinimumWidth(380)
+        self.setMinimumWidth(440)
         self.password = None
 
         layout = QVBoxLayout(self)
@@ -53,8 +53,8 @@ class UnlockDialog(QDialog):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Unlock journal")
-        self.setMinimumWidth(320)
+        self.setWindowTitle("Unlock Journal")
+        self.setMinimumWidth(380)
         self.password = None
 
         layout = QVBoxLayout(self)

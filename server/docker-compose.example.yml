@@ -1,0 +1,34 @@
+# Not a standalone compose file - this is the one service block to merge
+# into your existing docker-compose.yml on the Orange Pi, alongside your
+# other nginx/Cloudflare-fronted services.
+
+services:
+  journal:
+    build:
+      # Builds straight from GitHub - `#main:server` means branch `main`,
+      # subdirectory `server` (Docker's git-context syntax; no separate
+      # registry or CI needed). `docker compose build journal` re-pulls
+      # and rebuilds from whatever's on that branch right now.
+      context: https://github.com/jmleventhorpe/Journal.git#main:server
+      # Building from a local clone instead is just:
+      # context: ./Journal/server
+    restart: unless-stopped
+    volumes:
+      - journal_data:/data
+    environment:
+      # Flip this on once it's actually being served over HTTPS via your
+      # nginx/Cloudflare setup - see the comment in app.py for why it's
+      # off by default.
+      - JOURNAL_COOKIE_SECURE=1
+    networks:
+      - your_existing_network  # whatever network your nginx service is already on
+    # No `ports:` published to the host on purpose - nginx reaches this
+    # over the internal Docker network by service name (http://journal:8420),
+    # the same way your other internet-exposed services are already wired.
+    # The LAN-only requirement from the plan is satisfied by *not* publishing
+    # a host port here at all: this container is only reachable by other
+    # containers on `your_existing_network`, never directly from the internet
+    # or even the LAN, until nginx decides to proxy to it.
+
+volumes:
+  journal_data:
