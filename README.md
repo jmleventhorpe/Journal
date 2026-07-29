@@ -113,14 +113,20 @@ program. Set `JOURNAL_SERVER_URL` in your shell profile (or add
   size, font family, and (right-click an image) resize presets.
 - Drag an image file into the entry to embed it - it's scaled to a
   reasonable default size automatically; right-click it to resize.
-- **Template** (top of the calendar panel) switches to a reusable template
-  page, edited exactly like any day's entry. **Import Template** (top of
-  the entry pane) inserts it into whatever day you're on.
+- Misspelled words (desktop app only) get a red squiggly underline as you
+  type; right-click one for suggested corrections or to add it to the
+  session dictionary (handy for names and journal-specific terms).
+- **Template** and **Info** (top of the calendar panel) each switch to a
+  reusable page not tied to any date, edited exactly like any day's entry -
+  Template for a reusable starting point (see Import Template below), Info
+  for whatever you want at hand for quick reference (research notes, links,
+  whatever). **Import Template** (top of the entry pane) inserts the
+  template into whatever day you're on.
 - Dates with an entry are marked with a small dot on the calendar.
 - Window size and the calendar/editor split are remembered between runs.
 
 The web UI (open the server's URL in a browser) covers the same core
-flow - calendar, entry editor, template - via Quill.js instead of the
+flow - calendar, entry editor, template, info - via Quill.js instead of the
 desktop's native text widget.
 
 ## Where your data lives

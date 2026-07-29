@@ -3,6 +3,8 @@ template mode, autosave, and window/splitter state persistence."""
 
 import re
 
+import requests
+
 from PySide6.QtWidgets import (
     QMainWindow,
     QWidget,
@@ -28,6 +30,13 @@ IMG_SRC_RE = re.compile(r'src="([^"]+)"')
 
 class JournalWindow(QMainWindow):
     YEAR_CHOICES = 10
+    # "Special pages" are entries not tied to a date, edited in the exact
+    # same editor as any day. Keyed by name; each entry is (button label,
+    # server get function, server save function).
+    SPECIAL_PAGES = {
+        "template": ("Template", jdb.get_template, jdb.save_template),
+        "info": ("Info", jdb.get_info, jdb.save_info),
+    }
 
     def __init__(self, conn, key):
         super().__init__()
@@ -36,7 +45,7 @@ class JournalWindow(QMainWindow):
         self.current_date = QDate.currentDate()
         self.current_images = {}  # {resource_id: raw_bytes} for the entry on screen
         self.loading = False  # guard against autosave firing while we load an entry
-        self.viewing_template = False  # True while the template is loaded instead of a date
+        self.current_special_page = None  # None, "template", or "info" - see SPECIAL_PAGES
         self.settings = QSettings(str(APP_DIR / "settings.ini"), QSettings.IniFormat)
 
         self.setWindowTitle("Journal")
@@ -142,7 +151,11 @@ class JournalWindow(QMainWindow):
         self.current_images[resource_id] = data
 
     def _import_template(self):
-        html, images = jdb.get_template(self.conn, self.key)
+        try:
+            html, images = jdb.get_template(self.conn, self.key)
+        except requests.exceptions.RequestException as e:
+            self.status.showMessage(f"Could not load template: {e}", 5000)
+            return
         if not html and not images:
             self.status.showMessage("No template saved yet - click Template in the calendar to create one.", 3000)
             return
@@ -209,8 +222,18 @@ class JournalWindow(QMainWindow):
         self.template_button.setAutoRaise(True)
         self.template_button.setCheckable(True)
         self.template_button.setText("Template")
-        self.template_button.clicked.connect(self._show_template)
+        self.template_button.clicked.connect(lambda: self._show_special_page("template"))
         bar_layout.addWidget(self.template_button)
+
+        self.info_button = QToolButton()
+        self.info_button.setObjectName("infoButton")
+        self.info_button.setAutoRaise(True)
+        self.info_button.setCheckable(True)
+        self.info_button.setText("Info")
+        self.info_button.clicked.connect(lambda: self._show_special_page("info"))
+        bar_layout.addWidget(self.info_button)
+
+        self.special_page_buttons = {"template": self.template_button, "info": self.info_button}
 
         self.calendar.currentPageChanged.connect(self._on_calendar_page_changed)
         self._on_calendar_page_changed(self.calendar.yearShown(), self.calendar.monthShown())
@@ -231,7 +254,7 @@ class JournalWindow(QMainWindow):
         self._switch_to_date(self.calendar.selectedDate())
 
     def _switch_to_date(self, new_date):
-        if not self.viewing_template and new_date == self.current_date:
+        if self.current_special_page is None and new_date == self.current_date:
             return
         self._save_current_entry()  # flush any pending edits on whatever we're leaving
         self.current_date = new_date
@@ -244,32 +267,58 @@ class JournalWindow(QMainWindow):
             dates.add(QDate(y, m, d))
         self.calendar.set_entry_dates(dates)
 
-    def _show_template(self):
+    def _show_special_page(self, page_name):
         self._save_current_entry()  # flush any pending edits on whatever we're leaving
-        if self.viewing_template:
+        if self.current_special_page == page_name:
             self._load_entry(self.current_date)  # toggle back to the day we came from
         else:
-            self._load_template()
+            self._load_special_page(page_name)
+
+    def _sync_special_page_buttons(self):
+        """Force each button's visual checked state back to match
+        current_special_page. Needed after a failed load: a checkable
+        QToolButton auto-toggles its own checked state the instant it's
+        clicked, before our slot even runs, so on an early-return failure
+        the just-clicked button is left visually wrong unless we explicitly
+        correct it back here."""
+        for name, button in self.special_page_buttons.items():
+            button.setChecked(name == self.current_special_page)
 
     def _load_entry(self, date: QDate):
-        self.loading = True
-        self.viewing_template = False
-        self.template_button.setChecked(False)
-        self.import_template_button.setVisible(True)
         date_str = date.toString("yyyy-MM-dd")
-        self.date_label.setText(date.toString("dddd, d MMMM yyyy"))
+        # Fetch before touching any UI state: if the server call fails, the
+        # button/label/current_special_page must stay exactly as they were,
+        # not end up half-switched to a page that never actually loaded.
+        try:
+            html, images = jdb.get_entry(self.conn, self.key, date_str)
+        except requests.exceptions.RequestException as e:
+            self.status.showMessage(f"Could not load {date_str}: {e}", 5000)
+            self._sync_special_page_buttons()
+            return
 
-        html, images = jdb.get_entry(self.conn, self.key, date_str)
+        self.loading = True
+        self.current_special_page = None
+        for button in self.special_page_buttons.values():
+            button.setChecked(False)
+        self.import_template_button.setVisible(True)
+        self.date_label.setText(date.toString("dddd, d MMMM yyyy"))
         self._load_html_and_images(html, images)
 
-    def _load_template(self):
-        self.loading = True
-        self.viewing_template = True
-        self.template_button.setChecked(True)
-        self.import_template_button.setVisible(False)
-        self.date_label.setText("Template")
+    def _load_special_page(self, page_name):
+        label, get_fn, _save_fn = self.SPECIAL_PAGES[page_name]
+        try:
+            html, images = get_fn(self.conn, self.key)
+        except requests.exceptions.RequestException as e:
+            self.status.showMessage(f"Could not load {label}: {e}", 5000)
+            self._sync_special_page_buttons()
+            return
 
-        html, images = jdb.get_template(self.conn, self.key)
+        self.loading = True
+        self.current_special_page = page_name
+        for name, button in self.special_page_buttons.items():
+            button.setChecked(name == page_name)
+        self.import_template_button.setVisible(False)
+        self.date_label.setText(label)
         self._load_html_and_images(html, images)
 
     def _load_html_and_images(self, html, images):
@@ -305,16 +354,21 @@ class JournalWindow(QMainWindow):
             rid: data for rid, data in self.current_images.items() if rid in referenced_ids
         }
 
-        if self.viewing_template:
-            jdb.save_template(self.conn, self.key, html, images_to_save)
-        else:
-            date_str = self.current_date.toString("yyyy-MM-dd")
-            plain_text_present = bool(self.editor.toPlainText().strip()) or images_to_save
-            if plain_text_present:
-                jdb.save_entry(self.conn, self.key, date_str, html, images_to_save)
+        try:
+            if self.current_special_page is not None:
+                _label, _get_fn, save_fn = self.SPECIAL_PAGES[self.current_special_page]
+                save_fn(self.conn, self.key, html, images_to_save)
             else:
-                jdb.delete_entry(self.conn, date_str)
-            self._refresh_calendar_highlights()
+                date_str = self.current_date.toString("yyyy-MM-dd")
+                plain_text_present = bool(self.editor.toPlainText().strip()) or images_to_save
+                if plain_text_present:
+                    jdb.save_entry(self.conn, self.key, date_str, html, images_to_save)
+                else:
+                    jdb.delete_entry(self.conn, date_str)
+                self._refresh_calendar_highlights()
+        except requests.exceptions.RequestException as e:
+            self.status.showMessage(f"Could not save: {e}", 5000)
+            return
 
         self.status.showMessage("Saved", 1500)
 

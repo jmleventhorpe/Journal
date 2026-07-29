@@ -1,7 +1,8 @@
-"""JournalTextEdit: the rich-text editor used for both day entries and the
-template - drag-drop image insertion plus a right-click formatting menu
-(bold/italic/heading/size/font/image resize)."""
+"""JournalTextEdit: the rich-text editor used for day entries, the
+template, and the info page - drag-drop image insertion plus a right-click
+formatting menu (bold/italic/heading/size/font/image resize/spell check)."""
 
+import re
 import uuid
 from pathlib import Path
 
@@ -14,12 +15,21 @@ from PySide6.QtGui import (
     QAction,
     QTextCursor,
     QTextImageFormat,
+    QColor,
 )
-from PySide6.QtCore import Qt, QUrl, Signal
+from PySide6.QtCore import Qt, QUrl, Signal, QTimer
+from spellchecker import SpellChecker
 
 from theme import FONT_OPTIONS
 
 IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".gif", ".bmp"}
+
+# Loaded once at import time (~80ms) and shared by every editor instance -
+# in practice there's only ever one JournalTextEdit alive at a time anyway
+# (the same widget is reused for dates, the template, and the info page).
+_SPELL_CHECKER = SpellChecker()
+_WORD_RE = re.compile(r"[A-Za-z']+")
+SPELLCHECK_UNDERLINE_COLOR = QColor("#ff5555")
 
 
 class JournalTextEdit(QTextEdit):
@@ -55,6 +65,18 @@ class JournalTextEdit(QTextEdit):
         # is what cursorForPosition()/mapToGlobal() below expect.
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
+
+        self._misspelled_spans = []  # [(start, end, word), ...] from the last scan
+        self._session_dictionary = set()  # words added via "Add to Dictionary" (lowercase)
+        self._applying_spellcheck_format = False  # guards against re-triggering ourselves
+        # Detection always runs (right-click suggestions work regardless);
+        # this only controls whether misspelled words get the red squiggly
+        # underline. Off by default - toggle via the right-click menu.
+        self._spellcheck_highlight_enabled = False
+        self._spell_timer = QTimer()
+        self._spell_timer.setSingleShot(True)
+        self._spell_timer.timeout.connect(self._run_spellcheck)
+        self.textChanged.connect(self._schedule_spellcheck)
 
     def canInsertFromMimeData(self, source):
         if self._dropped_image_urls(source):
@@ -131,6 +153,105 @@ class JournalTextEdit(QTextEdit):
         cursor = self.textCursor()
         cursor.mergeCharFormat(fmt)
         self.setTextCursor(cursor)
+
+    # ---------- spell check ----------
+
+    def _schedule_spellcheck(self):
+        if self._applying_spellcheck_format:
+            return  # this textChanged was caused by _run_spellcheck itself
+        self._spell_timer.start(500)
+
+    def _run_spellcheck(self):
+        # Detection always runs, regardless of _spellcheck_highlight_enabled,
+        # so right-click suggestions work even with highlighting off.
+        text = self.toPlainText()
+        matches = list(_WORD_RE.finditer(text))
+        words = {m.group().lower() for m in matches} - self._session_dictionary
+        unknown = _SPELL_CHECKER.unknown(words) if words else set()
+
+        self._misspelled_spans = [
+            (m.start(), m.end(), m.group()) for m in matches if m.group().lower() in unknown
+        ]
+
+        self._applying_spellcheck_format = True
+        try:
+            # Always clear first - covers both a normal rescan (previous
+            # underlines may no longer be valid) and highlighting having
+            # just been turned off (need to remove what's already there).
+            clear_fmt = QTextCharFormat()
+            clear_fmt.setUnderlineStyle(QTextCharFormat.NoUnderline)
+            doc_cursor = QTextCursor(self.document())
+            doc_cursor.select(QTextCursor.Document)
+            doc_cursor.mergeCharFormat(clear_fmt)
+
+            if not self._spellcheck_highlight_enabled:
+                return
+
+            spell_fmt = QTextCharFormat()
+            spell_fmt.setUnderlineStyle(QTextCharFormat.SpellCheckUnderline)
+            spell_fmt.setUnderlineColor(SPELLCHECK_UNDERLINE_COLOR)
+            for start, end, _word in self._misspelled_spans:
+                span_cursor = QTextCursor(self.document())
+                span_cursor.setPosition(start)
+                span_cursor.setPosition(end, QTextCursor.KeepAnchor)
+                span_cursor.mergeCharFormat(spell_fmt)
+        finally:
+            self._applying_spellcheck_format = False
+
+    def _toggle_spellcheck_highlight(self):
+        self._spellcheck_highlight_enabled = not self._spellcheck_highlight_enabled
+        self._run_spellcheck()
+
+    def _misspelled_word_at(self, pos):
+        """Returns (start, end, word) for the misspelled word at `pos`
+        (from the most recent scan), or None if there isn't one there."""
+        click_pos = self.cursorForPosition(pos).position()
+        doc_len = self.document().characterCount()
+        for start, end, word in self._misspelled_spans:
+            if end > doc_len:
+                continue  # stale span from before a full document reload
+            if start <= click_pos <= end:
+                return start, end, word
+        return None
+
+    @staticmethod
+    def _spelling_suggestions(word, limit=5):
+        candidates = _SPELL_CHECKER.candidates(word.lower())
+        if not candidates:
+            return []
+        ranked = sorted(candidates, key=lambda w: -_SPELL_CHECKER.word_frequency.dictionary.get(w, 0))
+        return ranked[:limit]
+
+    def _apply_spelling_suggestion(self, start, end, suggestion, original):
+        if original[:1].isupper():
+            suggestion = suggestion[:1].upper() + suggestion[1:]
+        cursor = QTextCursor(self.document())
+        cursor.setPosition(start)
+        cursor.setPosition(end, QTextCursor.KeepAnchor)
+        cursor.insertText(suggestion)
+
+    def _add_to_dictionary(self, word):
+        self._session_dictionary.add(word.lower())
+        self._run_spellcheck()
+
+    def _add_spelling_menu(self, menu, start, end, word):
+        suggestions = self._spelling_suggestions(word)
+        if suggestions:
+            for suggestion in suggestions:
+                action = QAction(suggestion, menu)
+                action.triggered.connect(
+                    lambda checked=False, s=start, e=end, sug=suggestion, w=word:
+                        self._apply_spelling_suggestion(s, e, sug, w)
+                )
+                menu.addAction(action)
+        else:
+            no_suggestions = QAction("No suggestions", menu)
+            no_suggestions.setEnabled(False)
+            menu.addAction(no_suggestions)
+
+        add_action = QAction(f'Add "{word}" to Dictionary', menu)
+        add_action.triggered.connect(lambda checked=False, w=word: self._add_to_dictionary(w))
+        menu.addAction(add_action)
 
     def _image_cursor_at(self, pos):
         """Returns a QTextCursor selecting exactly the image character at
@@ -211,6 +332,11 @@ class JournalTextEdit(QTextEdit):
         menu = self.createStandardContextMenu()
         menu.addSeparator()
 
+        misspelled = self._misspelled_word_at(pos)
+        if misspelled is not None:
+            self._add_spelling_menu(menu, *misspelled)
+            menu.addSeparator()
+
         image_cursor = self._image_cursor_at(pos)
         if image_cursor is not None:
             self._add_resize_image_menu(menu, image_cursor)
@@ -257,5 +383,12 @@ class JournalTextEdit(QTextEdit):
             font_action.setChecked(current_primary == families[0])
             font_action.triggered.connect(lambda checked=False, f=families: self._set_font_family(f))
             font_menu.addAction(font_action)
+
+        menu.addSeparator()
+        highlight_action = QAction("Highlight Misspelled Words", menu)
+        highlight_action.setCheckable(True)
+        highlight_action.setChecked(self._spellcheck_highlight_enabled)
+        highlight_action.triggered.connect(self._toggle_spellcheck_highlight)
+        menu.addAction(highlight_action)
 
         menu.exec(self.viewport().mapToGlobal(pos))

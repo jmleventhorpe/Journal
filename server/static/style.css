@@ -142,8 +142,13 @@ button, select, input {
   flex: 1;
 }
 
+.special-page-row {
+  display: flex;
+  gap: 8px;
+}
+
 .template-toggle-btn {
-  width: 100%;
+  flex: 1;
   background: #2d2d2d;
   color: #cccccc;
   border: 1px solid #3c3c3c;

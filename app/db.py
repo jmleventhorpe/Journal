@@ -98,3 +98,21 @@ def save_template(conn, key, html_text: str, images: dict):
     }
     resp = conn.post(f"{conn.base_url}/template", json=payload, timeout=30)
     resp.raise_for_status()
+
+
+def get_info(conn, key):
+    """Returns (html_text, {image_id: raw_bytes}) or (None, {}) if no info page is saved."""
+    resp = conn.get(f"{conn.base_url}/info", timeout=10)
+    resp.raise_for_status()
+    data = resp.json()
+    images = {rid: base64.b64decode(b64) for rid, b64 in data["images"].items()}
+    return data["html"], images
+
+
+def save_info(conn, key, html_text: str, images: dict):
+    payload = {
+        "html": html_text,
+        "images": {rid: base64.b64encode(raw).decode("ascii") for rid, raw in images.items()},
+    }
+    resp = conn.post(f"{conn.base_url}/info", json=payload, timeout=30)
+    resp.raise_for_status()

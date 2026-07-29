@@ -23,6 +23,7 @@ from crypto import (
 )
 
 TEMPLATE_KEY = "__template__"  # sentinel "date" in entries, never a real calendar day
+INFO_KEY = "__info__"  # sentinel "date" for the free-form reference/notes page
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
@@ -82,7 +83,9 @@ def unlock(conn: sqlite3.Connection, password: str):
 
 
 def list_entry_dates(conn: sqlite3.Connection) -> set:
-    rows = conn.execute("SELECT date FROM entries WHERE date != ?", (TEMPLATE_KEY,)).fetchall()
+    rows = conn.execute(
+        "SELECT date FROM entries WHERE date NOT IN (?, ?)", (TEMPLATE_KEY, INFO_KEY)
+    ).fetchall()
     return {r[0] for r in rows}
 
 
@@ -155,3 +158,15 @@ def save_template(conn: sqlite3.Connection, key: bytes, html_text: str, images: 
         save_entry(conn, key, TEMPLATE_KEY, html_text, images)
     else:
         delete_entry(conn, TEMPLATE_KEY)
+
+
+def get_info(conn: sqlite3.Connection, key: bytes):
+    """Returns (html_text, {image_id: raw_bytes}) or (None, {}) if no info page is saved."""
+    return get_entry(conn, key, INFO_KEY)
+
+
+def save_info(conn: sqlite3.Connection, key: bytes, html_text: str, images: dict):
+    if html_text.strip() or images:
+        save_entry(conn, key, INFO_KEY, html_text, images)
+    else:
+        delete_entry(conn, INFO_KEY)

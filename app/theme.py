@@ -58,11 +58,13 @@ QWidget#calendarNavBar QToolButton {
 QWidget#calendarNavBar QToolButton:hover {
     background-color: #37373d;
 }
-QWidget#calendarNavBar QToolButton#templateButton:checked {
+QWidget#calendarNavBar QToolButton#templateButton:checked,
+QWidget#calendarNavBar QToolButton#infoButton:checked {
     background-color: #007acc;
     color: #ffffff;
 }
-QWidget#calendarNavBar QToolButton#templateButton:checked:hover {
+QWidget#calendarNavBar QToolButton#templateButton:checked:hover,
+QWidget#calendarNavBar QToolButton#infoButton:checked:hover {
     background-color: #1177bb;
 }
 QCalendarWidget {

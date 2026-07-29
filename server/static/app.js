@@ -131,6 +131,7 @@
   const monthSelect = document.getElementById("month-select");
   const yearSelect = document.getElementById("year-select");
   const templateBtn = document.getElementById("template-btn");
+  const infoBtn = document.getElementById("info-btn");
   const importTemplateBtn = document.getElementById("import-template-btn");
   const appRoot = document.getElementById("app-root");
   const mobileTabCalendar = document.getElementById("mobile-tab-calendar");
@@ -161,14 +162,25 @@
     yearSelect.appendChild(opt);
   }
 
+  // "Special pages" are entries not tied to a date, edited in the same
+  // editor as any day - mirrors the desktop app's SPECIAL_PAGES.
+  const SPECIAL_PAGES = {
+    template: { label: "Template", path: "/template", button: templateBtn },
+    info: { label: "Info", path: "/info", button: infoBtn },
+  };
+
   const today = new Date();
   let viewYear = today.getFullYear();
   let viewMonth = today.getMonth(); // 0-11
   let selectedDate = formatDate(today);
-  let viewingTemplate = false;
+  let currentSpecialPage = null; // null, "template", or "info" - see SPECIAL_PAGES
   let entryDates = new Set();
   let loading = false; // guards against autosave firing while we're loading content
   let autosaveTimer = null;
+
+  function currentPath() {
+    return currentSpecialPage ? SPECIAL_PAGES[currentSpecialPage].path : `/entries/${selectedDate}`;
+  }
 
   function formatDate(d) {
     const y = d.getFullYear();
@@ -246,7 +258,7 @@
       cell.className = "day";
       if (cellDate.getMonth() !== viewMonth) cell.classList.add("other-month");
       if (dow === 0 || dow === 6) cell.classList.add("weekend");
-      if (!viewingTemplate && dateStr === selectedDate) cell.classList.add("selected");
+      if (!currentSpecialPage && dateStr === selectedDate) cell.classList.add("selected");
       cell.textContent = cellDate.getDate();
 
       if (entryDates.has(dateStr)) {
@@ -269,11 +281,11 @@
   }
 
   async function switchToDate(dateStr) {
-    if (!viewingTemplate && dateStr === selectedDate) return;
+    if (!currentSpecialPage && dateStr === selectedDate) return;
     await flushPendingSave();
     selectedDate = dateStr;
-    viewingTemplate = false;
-    templateBtn.classList.remove("active");
+    currentSpecialPage = null;
+    Object.values(SPECIAL_PAGES).forEach((p) => p.button.classList.remove("active"));
     importTemplateBtn.style.display = "";
     dateLabel.textContent = formatDateLabel(dateStr);
     await loadCurrent();
@@ -281,12 +293,12 @@
     showMobileView("editor");
   }
 
-  async function toggleTemplate() {
+  async function showSpecialPage(pageName) {
     await flushPendingSave();
-    viewingTemplate = !viewingTemplate;
-    templateBtn.classList.toggle("active", viewingTemplate);
-    importTemplateBtn.style.display = viewingTemplate ? "none" : "";
-    dateLabel.textContent = viewingTemplate ? "Template" : formatDateLabel(selectedDate);
+    currentSpecialPage = currentSpecialPage === pageName ? null : pageName;
+    Object.entries(SPECIAL_PAGES).forEach(([name, p]) => p.button.classList.toggle("active", name === currentSpecialPage));
+    importTemplateBtn.style.display = currentSpecialPage ? "none" : "";
+    dateLabel.textContent = currentSpecialPage ? SPECIAL_PAGES[currentSpecialPage].label : formatDateLabel(selectedDate);
     await loadCurrent();
     renderCalendar();
     showMobileView("editor");
@@ -294,8 +306,7 @@
 
   async function loadCurrent() {
     loading = true;
-    const path = viewingTemplate ? "/template" : `/entries/${selectedDate}`;
-    const res = await api(path);
+    const res = await api(currentPath());
     const data = await res.json();
     // Not quill.root.innerHTML = ... - that bypasses Quill's own Delta
     // model, leaving it out of sync with the DOM. Quill's internal
@@ -309,14 +320,13 @@
 
   async function saveCurrent() {
     const html = toStorageHtml(quill.root.innerHTML);
-    const path = viewingTemplate ? "/template" : `/entries/${selectedDate}`;
-    await api(path, {
+    await api(currentPath(), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ html, images: {} }),
     });
     setStatus("Saved", 1500);
-    if (!viewingTemplate) await refreshEntryDates();
+    if (!currentSpecialPage) await refreshEntryDates();
   }
 
   quill.on("text-change", () => {
@@ -347,7 +357,8 @@
     renderCalendar();
   });
 
-  templateBtn.addEventListener("click", toggleTemplate);
+  templateBtn.addEventListener("click", () => showSpecialPage("template"));
+  infoBtn.addEventListener("click", () => showSpecialPage("info"));
 
   importTemplateBtn.addEventListener("click", async () => {
     const res = await api("/template");
@@ -372,9 +383,8 @@
     // sendBeacon, unlike a normal fetch which the browser may cancel.
     if (autosaveTimer) {
       const html = toStorageHtml(quill.root.innerHTML);
-      const path = viewingTemplate ? "/template" : `/entries/${selectedDate}`;
       const blob = new Blob([JSON.stringify({ html, images: {} })], { type: "application/json" });
-      navigator.sendBeacon(path, blob);
+      navigator.sendBeacon(currentPath(), blob);
     }
   });
 

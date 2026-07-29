@@ -254,6 +254,31 @@ def save_template_route():
     return jsonify({"ok": True})
 
 
+# ---------------------------------------------------------------- Info
+
+@app.route("/info", methods=["GET"])
+@require_auth
+def get_info_route():
+    key = _current_key()
+    with _conn_lock:
+        html, images = db.get_info(_conn, key)
+    return jsonify({"html": html, "images": _encode_images(images)})
+
+
+@app.route("/info", methods=["POST"])
+@require_auth
+def save_info_route():
+    key = _current_key()
+    body = request.get_json(force=True, silent=True) or {}
+    html = body.get("html") or ""
+    images = {k: base64.b64decode(v) for k, v in (body.get("images") or {}).items()}
+    html, images = _normalize_inline_images(html, images)
+
+    with _conn_lock:
+        db.save_info(_conn, key, html, images)
+    return jsonify({"ok": True})
+
+
 # ---------------------------------------------------------------- Images
 
 @app.route("/images/<image_id>")
